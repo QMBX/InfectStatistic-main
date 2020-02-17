@@ -1,3 +1,5 @@
+import java.io.*;
+
 /**
  * InfectStatistic
  * TODO
@@ -6,8 +8,12 @@
  * @version xxx
  * @since xxx
  */
-class InfectStatistic {
-    public static void main(String[] args) {
-        System.out.println("helloworld");
+class InfectStatistic
+{
+    public static void main(String[] args)
+    {
+        Lib program = new Lib();
+
+        program.run(args);
     }
 }
