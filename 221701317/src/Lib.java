@@ -1,5 +1,5 @@
+import java.time.LocalDate;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 /**
@@ -12,11 +12,13 @@ import java.util.Map;
  */
 public class Lib
 {
-    public void run(String[] args)
+    void run(String[] args)
     {
         System.out.println("enter Lib class in run");
         CommandArgs commandArgs = new CommandArgs(args);
-        System.out.println(commandArgs.getValue("log"));
+        CommandFactory factory = new CommandFactory();
+        AbstractCommand command = factory.getCommand(commandArgs);
+        command.execute();
     }
 }
 
@@ -52,9 +54,8 @@ interface AbstractCommand
  * 将命令行参数和对命令行参数要用的几个操纵封装成一个对象
  * @version 0.1
  */
-class CommandArgs {
-
-
+class CommandArgs
+{
     //存储输入的各个参数与对应的值
     private Map<String, String> parameters = new HashMap<>();
     //存储命令的值
@@ -98,7 +99,7 @@ class CommandArgs {
      * 返回本次执行的命令名称
      * @return 本次执行的命令名称
      */
-    public String getCommand()
+    String getCommandName()
     {
         return commandName;
     }
@@ -108,7 +109,7 @@ class CommandArgs {
      * @param parameter 参数
      * @return 如果命令行中有出现参数，返回true,否则返回false
      */
-    public boolean hasParamerter(String parameter)
+    boolean hasParameter(String parameter)
     {
         return parameters.containsKey(parameter);
     }
@@ -118,8 +119,85 @@ class CommandArgs {
      * @param parameter 要获取的参数
      * @return 如果参数在命令行参数中有值，则返回对应的值，否则返回null
      */
-    public String getValue(String parameter)
+    String getValue(String parameter)
     {
         return parameters.get(parameter);
+    }
+}
+
+/**
+ * 将命令类注册到工厂，由工厂根据命令行参数生成对应的类
+ */
+class CommandFactory
+{
+    AbstractCommand getCommand(CommandArgs commandArgs)
+    {
+        AbstractCommand abstractCommand = null;
+        String commandName = commandArgs.getCommandName();
+
+        if ("list".equals(commandName))
+        {
+            abstractCommand = new ListCommand();
+        }
+
+        init(abstractCommand, commandArgs);
+
+
+
+        return abstractCommand;
+    }
+
+    void init(AbstractCommand abstractCommand, CommandArgs commandArgs)
+    {
+        //TODO 此处可改为抛出没有命令类的异常，在调用该方法的方法中统一处理
+        if (abstractCommand == null)
+        {
+            System.out.println("程序中不支持该命令");
+        }
+        else
+        {
+            String[] parameters = abstractCommand.getParameters();
+
+            for(int i = 0; i < parameters.length; i++)
+            {
+                if (commandArgs.hasParameter(parameters[i]))
+                    abstractCommand.config(parameters[i], commandArgs.getValue(parameters[i]));
+        }
+        }
+    }
+}
+
+class ListCommand implements AbstractCommand
+{
+    private static final String Name = "list";
+    private static final String[] parameters = {"log", "out", "date", "type", "province"};
+    private static final String[] provinces = {"安徽", "北京", "重庆", "福建", "甘肃", "广东", "广西", "贵州", "海南"
+        , "河北", "河南", "黑龙江", "湖北", "湖南", "吉林", "江苏", "江西", "辽宁", "内蒙古", "宁夏", "青海", "山东", "山西"
+        , "陕西", "上海", "四川", "天津", "西藏", "新疆", "云南", "浙江"};
+    private String inputPath, outputPath;
+    private LocalDate deadLine;
+
+    @Override
+    public String getCommandName()
+    {
+        return Name;
+    }
+
+    @Override
+    public String[] getParameters()
+    {
+        return parameters;
+    }
+
+    @Override
+    public void config(String parameter, String val)
+    {
+
+    }
+
+    @Override
+    public void execute()
+    {
+
     }
 }
