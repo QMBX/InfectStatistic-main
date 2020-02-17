@@ -60,7 +60,8 @@ class CommandArgs
     private Map<String, String> parameters = new HashMap<>();
     //存储命令的值
     private String commandName;
-
+    //当命令有自己的参数值时，采用的参数
+    private static final String DEFAULT_PARAMETER = "default";
     /**
      * 将命令行参数转化成参数到值的映射，默认每次运行只有一个命令
      * @param args 程序读取到的命令行参数
@@ -75,13 +76,18 @@ class CommandArgs
         else
         {
             int length = args.length;
-            String parameter = "default";
+            String parameter = DEFAULT_PARAMETER;
 
             commandName = args[0];
             for(int i = 1; i < length; i++)
             {
                 if (args[i].startsWith("-"))
                 {
+                    //TODO 此处改为参数异常抛出
+                    if (parameters.get(parameter) == null)
+                    {
+                        System.out.println("参数不正确");
+                    }
                     parameter = args[i].substring(1);
                 }
                 else
@@ -91,6 +97,11 @@ class CommandArgs
                     else
                         parameters.put(parameter, args[i]);
                 }
+            }
+            //TODO 此处改为参数异常抛出
+            if (parameters.get(parameter) == null)
+            {
+                System.out.println("参数不正确");
             }
         }
     }
@@ -130,6 +141,11 @@ class CommandArgs
  */
 class CommandFactory
 {
+    /**
+     * 通过命令行对象，生成并初始化对应的命令类
+     * @param commandArgs 使用到的命令行对象
+     * @return 初始化后的命令类
+     */
     AbstractCommand getCommand(CommandArgs commandArgs)
     {
         AbstractCommand abstractCommand = null;
@@ -139,15 +155,17 @@ class CommandFactory
         {
             abstractCommand = new ListCommand();
         }
-
         init(abstractCommand, commandArgs);
-
-
 
         return abstractCommand;
     }
 
-    void init(AbstractCommand abstractCommand, CommandArgs commandArgs)
+    /**
+     * 使用命令行对象对命令类进行初始化
+     * @param abstractCommand 要初始化的命令类
+     * @param commandArgs 使用到的命令行对象
+     */
+    private void init(AbstractCommand abstractCommand, CommandArgs commandArgs)
     {
         //TODO 此处可改为抛出没有命令类的异常，在调用该方法的方法中统一处理
         if (abstractCommand == null)
@@ -169,9 +187,9 @@ class CommandFactory
 
 class ListCommand implements AbstractCommand
 {
-    private static final String Name = "list";
-    private static final String[] parameters = {"log", "out", "date", "type", "province"};
-    private static final String[] provinces = {"安徽", "北京", "重庆", "福建", "甘肃", "广东", "广西", "贵州", "海南"
+    private static final String COMMAND_NAME = "list";
+    private static final String[] PARMETERS = {"log", "out", "date", "type", "province"};
+    private static final String[] PROVINCES = {"安徽", "北京", "重庆", "福建", "甘肃", "广东", "广西", "贵州", "海南"
         , "河北", "河南", "黑龙江", "湖北", "湖南", "吉林", "江苏", "江西", "辽宁", "内蒙古", "宁夏", "青海", "山东", "山西"
         , "陕西", "上海", "四川", "天津", "西藏", "新疆", "云南", "浙江"};
     private String inputPath, outputPath;
@@ -180,13 +198,13 @@ class ListCommand implements AbstractCommand
     @Override
     public String getCommandName()
     {
-        return Name;
+        return COMMAND_NAME;
     }
 
     @Override
     public String[] getParameters()
     {
-        return parameters;
+        return PARMETERS;
     }
 
     @Override
