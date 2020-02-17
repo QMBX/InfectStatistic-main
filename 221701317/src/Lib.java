@@ -1,6 +1,10 @@
+import java.io.File;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 /**
  * Lib
@@ -79,7 +83,7 @@ class CommandArgs
             String parameter = DEFAULT_PARAMETER;
 
             commandName = args[0];
-            for(int i = 1; i < length; i++)
+            for (int i = 1; i < length; i++)
             {
                 if (args[i].startsWith("-"))
                 {
@@ -141,6 +145,8 @@ class CommandArgs
  */
 class CommandFactory
 {
+    private static final String LIST_COMMAND = "list";
+
     /**
      * 通过命令行对象，生成并初始化对应的命令类
      * @param commandArgs 使用到的命令行对象
@@ -151,9 +157,14 @@ class CommandFactory
         AbstractCommand abstractCommand = null;
         String commandName = commandArgs.getCommandName();
 
-        if ("list".equals(commandName))
+        if (LIST_COMMAND.equals(commandName))
         {
             abstractCommand = new ListCommand();
+        }
+        else
+        {
+            //TODO: 此处应抛出没有相应命令的异常
+            System.out.println("程序没有相应命令");
         }
         init(abstractCommand, commandArgs);
 
@@ -167,33 +178,41 @@ class CommandFactory
      */
     private void init(AbstractCommand abstractCommand, CommandArgs commandArgs)
     {
-        //TODO 此处可改为抛出没有命令类的异常，在调用该方法的方法中统一处理
-        if (abstractCommand == null)
-        {
-            System.out.println("程序中不支持该命令");
-        }
-        else
-        {
-            String[] parameters = abstractCommand.getParameters();
+        String[] parameters = abstractCommand.getParameters();
 
-            for(int i = 0; i < parameters.length; i++)
-            {
-                if (commandArgs.hasParameter(parameters[i]))
-                    abstractCommand.config(parameters[i], commandArgs.getValue(parameters[i]));
-        }
-        }
+        for (int i = 0; i < parameters.length; i++)
+            if (commandArgs.hasParameter(parameters[i]))
+                abstractCommand.config(parameters[i], commandArgs.getValue(parameters[i]));
     }
+}
+
+enum PATIENT_TYPE
+{
+    INFECTION, SUSPECTED, CURE, DEAD
 }
 
 class ListCommand implements AbstractCommand
 {
     private static final String COMMAND_NAME = "list";
-    private static final String[] PARMETERS = {"log", "out", "date", "type", "province"};
+    private static final String PARAMETER_LOG_PATH = "log";
+    private static final String PARAMETER_OUTPUT_FILE = "out";
+    private static final String PARAMETER_DEADLINE = "date";
+    private static final String PARAMETER_TYPE = "type";
+    private static final String INFECTION_PATIENTS = "ip";
+    private static final String SUSPECTED_PATIENTS = "sp";
+    private static final String CURE_PATIENTS = "cure";
+    private static final String DEAD_PATIENTS = "dead";
+    private static final String PARAMETER_PROVINCES = "province";
+    private static final String[] PARMETERS = {PARAMETER_LOG_PATH, PARAMETER_OUTPUT_FILE, PARAMETER_DEADLINE
+        , PARAMETER_TYPE, PARAMETER_PROVINCES};
     private static final String[] PROVINCES = {"安徽", "北京", "重庆", "福建", "甘肃", "广东", "广西", "贵州", "海南"
         , "河北", "河南", "黑龙江", "湖北", "湖南", "吉林", "江苏", "江西", "辽宁", "内蒙古", "宁夏", "青海", "山东", "山西"
         , "陕西", "上海", "四川", "天津", "西藏", "新疆", "云南", "浙江"};
+
     private String inputPath, outputPath;
     private LocalDate deadLine;
+    private List<PATIENT_TYPE> showTypes = new ArrayList<>();
+    private List<String> showProvinces = new ArrayList<>();
 
     @Override
     public String getCommandName()
@@ -210,12 +229,88 @@ class ListCommand implements AbstractCommand
     @Override
     public void config(String parameter, String val)
     {
+        if (PARAMETER_LOG_PATH.equals(parameter))
+        {
+            File dir = new File(val);
 
+            if (!dir.exists())
+            {
+                //TODO: 改为抛出路径不存在的异常
+                System.out.println("日志文件夹不存在");
+            }
+            inputPath = val;
+        }
+        else if (PARAMETER_OUTPUT_FILE.equals(parameter))
+        {
+            outputPath = val;
+        }
+        else if (PARAMETER_DEADLINE.equals(parameter))
+        {
+            /*
+            TODO: 这里将会对日期格式进行检验，日期格式由LocalDate类内置指定，为“XXXX-XX-XX”
+                如果日期出现错误，将会抛出java.time.format.DateTimeParseException错误，需要在对应位置进行处理
+            */
+            deadLine = LocalDate.parse(val);
+    }
+        else if (PARAMETER_TYPE.equals(parameter))
+        {
+            String[] types = val.split(" ");
+
+            for (int i = 0 ; i < types.length; i++)
+            {
+                if (INFECTION_PATIENTS.equals(types[i]))
+                    showTypes.add(PATIENT_TYPE.INFECTION);
+                else if (SUSPECTED_PATIENTS.equals(types[i]))
+                    showTypes.add(PATIENT_TYPE.SUSPECTED);
+                else if (CURE_PATIENTS.equals(types[i]))
+                    showTypes.add(PATIENT_TYPE.CURE);
+                else if (DEAD_PATIENTS.equals(types[i]))
+                    showTypes.add(PATIENT_TYPE.DEAD);
+                else
+                {
+                    //TODO 这里应该抛出参数错误的异常
+                    System.out.println("输入参数有误");
+                }
+            }
+        }
+        else if (PARAMETER_PROVINCES.equals(parameter))
+        {
+            String[] provinces = val.split(" ");
+            boolean isMatch = false;
+
+            for (int i = 0; i < provinces.length; i++)
+            {
+                isMatch = false;
+                for (int j = 0; j < PROVINCES.length; j++)
+                {
+                    if (provinces[i].equals(PROVINCES[j]))
+                    {
+                        showProvinces.add(PROVINCES[j]);
+                        isMatch = true;
+                        break;
+                    }
+                }
+                if (!isMatch)
+                {
+                    //TODO: 此处应抛出省份参数错误的异常
+                    System.out.println("省份参数错误");
+                }
+            }
+
+        }
     }
 
     @Override
     public void execute()
     {
-
+        /* 以下代码用于检测命令类是否配置成功
+        System.out.println("inputPath: " + inputPath);
+        System.out.println("outputPath: " + outputPath);
+        System.out.println(deadLine);
+        for (int i = 0; i < showTypes.size(); i++)
+            System.out.println(showTypes.get(i));
+        for (int i = 0; i < showProvinces.size(); i++)
+            System.out.println(showProvinces.get(i));
+        */
     }
 }
