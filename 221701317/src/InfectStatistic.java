@@ -4,9 +4,8 @@ import java.io.*;
  * InfectStatistic
  * TODO
  *
- * @author xxx
- * @version xxx
- * @since xxx
+ * @author zxx
+ * @version 1.0
  */
 class InfectStatistic
 {

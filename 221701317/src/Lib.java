@@ -1,9 +1,4 @@
-import junit.framework.TestCase;
-import org.junit.Test;
-
-import javax.xml.stream.events.Comment;
 import java.io.*;
-import java.sql.SQLOutput;
 import java.time.LocalDate;
 import java.time.format.DateTimeParseException;
 import java.util.*;
@@ -14,12 +9,16 @@ import java.util.regex.Pattern;
  * Lib
  * TODO
  *
- * @author xxx
- * @version xxx
- * @since 0.1
+ * @author zxx
+ * @version 1.0
  */
 public class Lib
 {
+    /**
+     * 该函数为程序真正的入口。
+     * 根据命令行参数，生成对应的命令类，然后执行命令类
+     * @param args 命令行参数
+     */
     void run(String[] args)
     {
         System.out.println("enter Lib class in run");
@@ -31,14 +30,13 @@ public class Lib
     }
 }
 
+/**
+ * 命令类的接口，通过该接口方便对命令进行扩充
+ * @author zxx
+ * @version 1.0
+ */
 interface AbstractCommand
 {
-    /**
-     * 获得当前命令的名称
-     * @return 返回当前命令的名称.
-     */
-    String getCommandName();
-
     /**
      * 获取命令所需的参数
      * @return 命令需要的参数
@@ -61,7 +59,8 @@ interface AbstractCommand
 /**
  * 命令行参数对象
  * 将命令行参数和对命令行参数要用的几个操纵封装成一个对象
- * @version 0.1
+ * @author zxx
+ * @version 1.0
  */
 class CommandArgs
 {
@@ -192,6 +191,11 @@ class CommandFactory
     }
 }
 
+/**
+ * 对病人数据的分类，同时建立枚举与分类的名称的映射
+ * @author zxx
+ * @version 1.0
+ */
 enum PATIENT_TYPE
 {
     INFECTION(0,"感染患者"), SUSPECTED(1, "疑似患者"), CURE(2, "治愈"), DEAD(3, "死亡");
@@ -204,11 +208,19 @@ enum PATIENT_TYPE
         this.name = name;
     }
 
-
+    /**
+     * 获得枚举的位置，位置信息描述了存储一个区域中的病人数据时，数据类型按该位置排序
+     * @return 返回当前类型在所有类型中的位置
+     */
     int getValue()
     {
         return value;
     }
+
+    /**
+     * 获得该类型的名称
+     * @return 该枚举类型对应的名称
+     */
     String getName()
     {
         return name;
@@ -216,6 +228,12 @@ enum PATIENT_TYPE
 
 }
 
+/**
+ * list命令类，实现了AbstractCommand接口
+ * 当前将数据的统计和输出都集成在这个类中
+ * @author zxx
+ * @version 1.0
+ */
 class ListCommand implements AbstractCommand
 {
     private static final String COMMAND_NAME = "list";
@@ -248,12 +266,6 @@ class ListCommand implements AbstractCommand
         {
             showTypes.add(type);
         }
-    }
-
-    @Override
-    public String getCommandName()
-    {
-        return COMMAND_NAME;
     }
 
     @Override
@@ -351,7 +363,7 @@ class ListCommand implements AbstractCommand
         }
         isChange[0] = true;
 
-        //读取数据
+        //统计数据
         try
         {
             LogParser parser = null;
@@ -441,6 +453,10 @@ class ListCommand implements AbstractCommand
         */
     }
 
+    /**
+     * 获得命令参数中inputPath对应的目录下的所有满足日志格式，并在date参数指定的日期之前的日志文件
+     * @return log参数值的目录下，在date指定的日期之前（包括指定日期）的所有日志名称数组
+     */
     private List<String> getLogFile()
     {
         File dir = new File(inputPath);
@@ -471,6 +487,11 @@ class ListCommand implements AbstractCommand
         return logs;
     }
 
+    /**
+     * 按 《省》 数据类型人数 的格式输出数据
+     * @param provienceName 输出的数据对应的区域名
+     * @param paintsNum 要输出的数据
+     */
     private void printPaint(String provienceName,int[] paintsNum)
     {
         System.out.print(provienceName);
@@ -484,15 +505,30 @@ class ListCommand implements AbstractCommand
     }
 }
 
-
+/**
+ * 该类存放某个省某类病人人数变化的数据
+ * 该类与日志文件中的记载行是多对一的。
+ * @author zxx
+ * @version 1.0
+ */
 class ChangeArray
 {
     String province;
     PATIENT_TYPE type;
     int num;
 
+    /**
+     * 私有的构造方法，避免数据赋值的情况
+     */
     private ChangeArray(){}
 
+    /**
+     * 由该静态方法产生存放数据的ChaangeArray类
+     * @param province 数据发生变化的区域名称
+     * @param type 发生变化的数据类型
+     * @param num 数据变化了多少。可正可负，将变化统计时，该数以加法加入总数
+     * @return 返回存储数据的ChangeArray
+     */
     static ChangeArray changeOf(String province, PATIENT_TYPE type, int num)
     {
         ChangeArray increase = new ChangeArray();
@@ -503,21 +539,38 @@ class ChangeArray
 
         return increase;
     }
+
+    /**
+     * 获得该类中存储的省份名称
+     * @return 省份名称
+     */
     String getProvince()
     {
         return province;
     }
+    /**
+     * 获得该类中存储的数据类型
+     * @return 数据类型
+     */
     PATIENT_TYPE getType()
     {
         return type;
     }
+    /**
+     * 获得该类中存储的变化数量
+     * @return 变化数量
+     */
     int getNum()
     {
         return num;
     }
 }
 
-
+/**
+ * 日志处理类，读取一个日志文件中的每一行，并让LogLine链去处理行
+ * @author zxx
+ * @#version 1.0
+ */
 class LogParser
 {
     String logName, path;
@@ -532,6 +585,13 @@ class LogParser
     private ComfireInfectionPatientLine comfireInfectionPatientLine;
     private ExcludeSuspectedPatientLine excludeSuspectedPatientLine;
     private UnexpectedLine unexpectedLine;
+
+    /**
+     * 初始化处理器的参数
+     * @param path 要读取的文件所在文件夹
+     * @param name 要读取的文件名
+     * @throws FileNotFoundException 如果找不到文件，将抛出该异常
+     */
     LogParser(String path, String name) throws FileNotFoundException
     {
         this.path = path;
@@ -561,6 +621,11 @@ class LogParser
         excludeSuspectedPatientLine.setNextLogLine(unexpectedLine);
     }
 
+    /**
+     * 从第一行开始，每调用一次，返回下一行数据。
+     * @return 之前读取行的下一行。如果到达文件结尾，则返回null并关闭打开的文件
+     * @throws IOException 如果读写器已经关闭后还执行该方法，或者读取下一行数据时出现错误，则抛出该异常
+     */
     List<ChangeArray> nextLine() throws IOException
     {
         String line;
@@ -571,18 +636,21 @@ class LogParser
             return commentLine.parseLine(line);
         }
         else
+        {
+            dataInput.close();
             return null;
-    }
-
-
-    void close() throws IOException
-    {
-        dataInput.close();
+        }
     }
 
 
 }
 
+/**
+ * 日志行处理类的统一接口
+ * 目前实现责任链模式的方法还可以优化，可以用类的继承来替代接口的使用
+ * @author zxx
+ * @version 1.0
+ */
 interface LogLine
 {
     /**
