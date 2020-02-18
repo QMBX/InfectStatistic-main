@@ -80,7 +80,7 @@ class CommandArgs
      */
     CommandArgs(String[] args) throws MyExcepiton
     {
-        if (args.length <= 0)
+        if (args == null || args.length <= 0)
             throw new MyExcepiton("程序缺少参数");
         else
         {
@@ -340,6 +340,10 @@ class ListCommand implements AbstractCommand
     @Override
     public void execute() throws MyExcepiton
     {
+        if (inputPath == null)
+            throw new MyExcepiton("缺少log参数");
+        if (outputPath == null)
+            throw new MyExcepiton("缺少out参数");
         List<String>logs = getLogFile();
 
         int[][] patients = new int[PROVINCES.length][4];
