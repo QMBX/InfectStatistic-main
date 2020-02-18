@@ -409,7 +409,7 @@ class ListCommand implements AbstractCommand
                 for (String showProvience : showProvinces)
                     for (int i = 0; i < PROVINCES.length; i++)
                         if (PROVINCES[i].equals(showProvience))
-                            printPaint(showProvience, patients[i]);
+                            printPaint(dataOutput, showProvience, patients[i]);
             }
             else
             {
@@ -417,15 +417,21 @@ class ListCommand implements AbstractCommand
                 {
                     if (isChange[i])
                     {
-                        printPaint(PROVINCES[i], patients[i]);
+                        printPaint(dataOutput, PROVINCES[i], patients[i]);
                     }
                 }
             }
-
+            dataOutput.write("// 该文档并非真实数据，仅供测试使用");
+            dataOutput.flush();
+            dataOutput.close();
         }
         catch (FileNotFoundException ex)
         {
             throw new MyExcepiton("输出文件夹创建失败");
+        }
+        catch (IOException ioex)
+        {
+            throw new MyExcepiton("生成结果文件错误");
         }
 
         /* 以下代码用于检测命令类是否配置成功
@@ -472,19 +478,28 @@ class ListCommand implements AbstractCommand
 
     /**
      * 按 《省》 数据类型人数 的格式输出数据
+     * @param dataOutput 要输出的文件对应的流
      * @param provienceName 输出的数据对应的区域名
      * @param paintsNum 要输出的数据
      */
-    private void printPaint(String provienceName,int[] paintsNum)
+    private void printPaint(BufferedWriter dataOutput ,String provienceName,int[] paintsNum) throws MyExcepiton
     {
-        System.out.print(provienceName);
-        for (PATIENT_TYPE type : showTypes)
+        try
         {
-            System.out.print(" ");
-            System.out.print(type.getName());
-            System.out.print(paintsNum[type.getValue()]+"人");
+            dataOutput.write(provienceName);
+//            System.out.print(provienceName);
+            for (PATIENT_TYPE type : showTypes) {
+                dataOutput.write(" ");
+                dataOutput.write(type.getName());
+                dataOutput.write(paintsNum[type.getValue()] + "人");
+            }
+            dataOutput.flush();
+            dataOutput.newLine();
         }
-        System.out.println();
+        catch (IOException ex)
+        {
+            throw new MyExcepiton("生成结果文件错误。");
+        }
     }
 }
 
