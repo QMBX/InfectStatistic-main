@@ -3,7 +3,9 @@ import org.junit.Test;
 
 import javax.xml.stream.events.Comment;
 import java.io.*;
+import java.sql.SQLOutput;
 import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -192,7 +194,26 @@ class CommandFactory
 
 enum PATIENT_TYPE
 {
-    INFECTION, SUSPECTED, CURE, DEAD
+    INFECTION(0,"感染患者"), SUSPECTED(1, "疑似患者"), CURE(2, "治愈"), DEAD(3, "死亡");
+
+    private int value;
+    private String name;
+    PATIENT_TYPE(int value, String name)
+    {
+        this.value = value;
+        this.name = name;
+    }
+
+
+    int getValue()
+    {
+        return value;
+    }
+    String getName()
+    {
+        return name;
+    }
+
 }
 
 class ListCommand implements AbstractCommand
@@ -209,7 +230,7 @@ class ListCommand implements AbstractCommand
     private static final String PARAMETER_PROVINCES = "province";
     private static final String[] PARMETERS = {PARAMETER_LOG_PATH, PARAMETER_OUTPUT_FILE, PARAMETER_DEADLINE
         , PARAMETER_TYPE, PARAMETER_PROVINCES};
-    private static final String[] PROVINCES = {"安徽", "北京", "重庆", "福建", "甘肃", "广东", "广西", "贵州", "海南"
+    private static final String[] PROVINCES = {"全国","安徽", "北京", "重庆", "福建", "甘肃", "广东", "广西", "贵州", "海南"
         , "河北", "河南", "黑龙江", "湖北", "湖南", "吉林", "江苏", "江西", "辽宁", "内蒙古", "宁夏", "青海", "山东", "山西"
         , "陕西", "上海", "四川", "天津", "西藏", "新疆", "云南", "浙江"};
 
@@ -217,6 +238,17 @@ class ListCommand implements AbstractCommand
     private LocalDate deadLine;
     private List<PATIENT_TYPE> showTypes = new ArrayList<>();
     private List<String> showProvinces = new ArrayList<>();
+
+    /**
+     * 初始化命令参数值
+     */
+    ListCommand()
+    {
+        for(PATIENT_TYPE type : PATIENT_TYPE.values())
+        {
+            showTypes.add(type);
+        }
+    }
 
     @Override
     public String getCommandName()
@@ -259,7 +291,7 @@ class ListCommand implements AbstractCommand
         else if (PARAMETER_TYPE.equals(parameter))
         {
             String[] types = val.split(" ");
-
+            showTypes.clear();
             for (int i = 0 ; i < types.length; i++)
             {
                 if (INFECTION_PATIENTS.equals(types[i]))
@@ -300,46 +332,57 @@ class ListCommand implements AbstractCommand
                     System.out.println("省份参数错误");
                 }
             }
-
         }
     }
 
     @Override
     public void execute()
     {
-        File dir = new File(inputPath);
-        String[] names = dir.list();
-        List<String>logs = new ArrayList<>();
-        String DATA_FORMAT = "^\\d{4}-\\d{2}-\\d{2}.log.txt$";
+        List<String>logs = getLogFile();
 
-        for(int i = 0 ; i < names.length; i++)
-        {
-            if (Pattern.matches(DATA_FORMAT, names[i]))
-            {
-                logs.add(names[i]);
-            }
-        }
-        if (logs.size() <= 0)
-        {
-            //TODO: 此处应抛出不存在日志文件的异常
-            System.out.println("不存在日志文件");
-        }
-        Collections.sort(logs);
+        int[][] patients = new int[PROVINCES.length][4];
+        boolean[] isChange = new boolean[PROVINCES.length];
 
+        for (int i = 0; i < patients.length; i++)
+        {
+            for (int j = 0; j < patients[i].length; j++)
+                patients[i][j] = 0;
+            isChange[i] = false;
+        }
+        isChange[0] = true;
+
+        //读取数据
         try
         {
-            BufferedReader dataInput;
-
-            String line;
+            LogParser parser = null;
+            List<ChangeArray>changes = null;
 
             for (String log : logs)
             {
-                dataInput = new BufferedReader(new InputStreamReader(new FileInputStream(inputPath)));
+                parser = new LogParser(inputPath, log);
+                while((changes = parser.nextLine()) != null)
+                {
+                    for(ChangeArray change: changes)
+                    {
+                        String province = change.getProvince();
+                        int index = 0;
+                        for(; index < PROVINCES.length; index++)
+                        {
+                            if (PROVINCES[index].equals(province))
+                                break;
+                        }
+                        if (index == PROVINCES.length)
+                        {
+                            //TODO: 此处抛出出现未知省份的异常
+                            System.out.println("出现未知省份");
+                        }
 
-                line = dataInput.readLine();
-
-
-
+                        if (!isChange[index])
+                            isChange[index] = true;
+                        patients[index][change.getType().getValue()] += change.getNum();
+                        patients[0][change.getType().getValue()] += change.getNum();
+                    }
+                }
             }
         }
         catch (FileNotFoundException ex)
@@ -353,11 +396,32 @@ class ListCommand implements AbstractCommand
             System.out.println("日志文件读取出错");
         }
 
-
-        try
-        {
+        //输出数据
+        try {
             BufferedWriter dataOutput
                     = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(outputPath)));
+            int[] sum = new int[patients[0].length];
+            for (int i : sum)
+                i = 0;
+
+
+            if (showProvinces != null && showProvinces.size() > 0)
+            {
+                for (String showProvience : showProvinces)
+                    for (int i = 0; i < PROVINCES.length; i++)
+                        if (PROVINCES[i].equals(showProvience))
+                            printPaint(showProvience, patients[i]);
+            }
+            else
+            {
+                for (int i = 0; i < PROVINCES.length; i++)
+                {
+                    if (isChange[i])
+                    {
+                        printPaint(PROVINCES[i], patients[i]);
+                    }
+                }
+            }
 
         }
         catch (FileNotFoundException ex)
@@ -375,6 +439,48 @@ class ListCommand implements AbstractCommand
         for (int i = 0; i < showProvinces.size(); i++)
             System.out.println(showProvinces.get(i));
         */
+    }
+
+    private List<String> getLogFile()
+    {
+        File dir = new File(inputPath);
+        String[] names = dir.list();
+        List<String>logs = new ArrayList<>();
+        String DATA_FORMAT = "^\\d{4}-\\d{2}-\\d{2}.log.txt$";
+
+        for(int i = 0 ; i < names.length; i++)
+            if (Pattern.matches(DATA_FORMAT, names[i]))
+            {
+                try
+                {
+                    LocalDate logtime = LocalDate.parse(names[i].substring(0,10));
+                    if (deadLine == null || deadLine.isAfter(logtime) || deadLine.isEqual(logtime))
+                    {
+                        logs.add(names[i]);
+                    }
+                }
+                catch (DateTimeParseException ex) {}
+            }
+
+        if (logs.size() <= 0)
+        {
+            //TODO: 此处应抛出目录下不存在日志文件的异常
+            System.out.println("不存在日志文件");
+        }
+        Collections.sort(logs);
+        return logs;
+    }
+
+    private void printPaint(String provienceName,int[] paintsNum)
+    {
+        System.out.print(provienceName);
+        for (PATIENT_TYPE type : showTypes)
+        {
+            System.out.print(" ");
+            System.out.print(type.getName());
+            System.out.print(paintsNum[type.getValue()]+"人");
+        }
+        System.out.println();
     }
 }
 
@@ -416,16 +522,16 @@ class LogParser
 {
     String logName, path;
     BufferedReader dataInput;
-    CommentLine commentLine;
-    IncreaseInfectionPatientLine increaseInfectionPatientLine;
-    IncreaseSuspectedPatientLine increaseSuspectedPatientLine;
-    ChangeInfectionPatientLine changeInfectionPatientLine;
-    ChangeSuspectedPatientLine changeSuspectedPatientLine;
-    IncreaseDeadPatientLine increaseDeadPatientLine;
-    IncreaseCurePatientLine increaseCurePatientLine;
-    ComfireInfectionPatientLine comfireInfectionPatientLine;
-    ExcludeSuspectedPatientLine excludeSuspectedPatientLine;
-    UnexpectedLine unexpectedLine;
+    private CommentLine commentLine;
+    private IncreaseInfectionPatientLine increaseInfectionPatientLine;
+    private IncreaseSuspectedPatientLine increaseSuspectedPatientLine;
+    private ChangeInfectionPatientLine changeInfectionPatientLine;
+    private ChangeSuspectedPatientLine changeSuspectedPatientLine;
+    private IncreaseDeadPatientLine increaseDeadPatientLine;
+    private IncreaseCurePatientLine increaseCurePatientLine;
+    private ComfireInfectionPatientLine comfireInfectionPatientLine;
+    private ExcludeSuspectedPatientLine excludeSuspectedPatientLine;
+    private UnexpectedLine unexpectedLine;
     LogParser(String path, String name) throws FileNotFoundException
     {
         this.path = path;
@@ -494,7 +600,7 @@ interface LogLine
 }
 
 /**
- * 对应行格式：以//开头的注释
+ * 对应行格式：以//开头的注释或空行
  */
 class CommentLine implements LogLine
 {
@@ -510,7 +616,7 @@ class CommentLine implements LogLine
     @Override
     public List<ChangeArray> parseLine(String line)
     {
-        if (Pattern.matches(PATTERN, line))
+        if ("".equals(line) || Pattern.matches(PATTERN, line))
             return null;
         else
             return nextLogLine.parseLine(line);
@@ -712,7 +818,7 @@ class IncreaseDeadPatientLine implements LogLine
  */
 class IncreaseCurePatientLine implements LogLine
 {
-    private static final String PATTERN = ".*死亡.*";
+    private static final String PATTERN = ".*治愈.*";
     private LogLine nextLogLine;
 
     @Override
@@ -838,7 +944,7 @@ class UnexpectedLine implements LogLine
     {
         //TODO: 抛出一个意料之外的行的异常
         System.out.println("出现一个意料之外的行");
-
+        System.out.println(line);
         return null;
     }
 }
