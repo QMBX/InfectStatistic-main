@@ -7,8 +7,6 @@ import java.util.regex.Pattern;
 
 /**
  * Lib
- * TODO
- *
  * @author zxx
  * @version 1.0
  */
@@ -21,12 +19,18 @@ public class Lib
      */
     void run(String[] args)
     {
-        System.out.println("enter Lib class in run");
+        try
+        {
+            CommandArgs commandArgs = new CommandArgs(args);
+            CommandFactory factory = new CommandFactory();
+            AbstractCommand command = factory.getCommand(commandArgs);
+            command.execute();
+        }
+        catch (MyExcepiton mex)
+        {
+            System.out.println(mex.getMessage());
+        }
 
-        CommandArgs commandArgs = new CommandArgs(args);
-        CommandFactory factory = new CommandFactory();
-        AbstractCommand command = factory.getCommand(commandArgs);
-        command.execute();
     }
 }
 
@@ -48,12 +52,12 @@ interface AbstractCommand
      * @param parameter 传入的参数
      * @param val 参数的值
      */
-    void config(String parameter, String val);
+    void config(String parameter, String val) throws MyExcepiton;
 
     /**
      * 执行命令
      */
-    void execute();
+    void execute() throws MyExcepiton;
 }
 
 /**
@@ -74,13 +78,10 @@ class CommandArgs
      * 将命令行参数转化成参数到值的映射，默认每次运行只有一个命令
      * @param args 程序读取到的命令行参数
      */
-    CommandArgs(String[] args)
+    CommandArgs(String[] args) throws MyExcepiton
     {
         if (args.length <= 0)
-        {
-            //TODO： 此处需改为异常抛出
-            System.out.println("程序缺少参数");
-        }
+            throw new MyExcepiton("程序缺少参数");
         else
         {
             int length = args.length;
@@ -91,11 +92,8 @@ class CommandArgs
             {
                 if (args[i].startsWith("-"))
                 {
-                    //TODO 此处改为参数异常抛出
-                    if (parameters.get(parameter) == null)
-                    {
-                        System.out.println("参数不正确");
-                    }
+                    if (parameters.get(parameter) == null && !DEFAULT_PARAMETER.equals(parameter))
+                        throw new MyExcepiton("参数不正确");
                     parameter = args[i].substring(1);
                 }
                 else
@@ -106,11 +104,8 @@ class CommandArgs
                         parameters.put(parameter, args[i]);
                 }
             }
-            //TODO 此处改为参数异常抛出
             if (parameters.get(parameter) == null)
-            {
-                System.out.println("参数不正确");
-            }
+                throw new MyExcepiton("参数不正确");
         }
     }
 
@@ -157,7 +152,7 @@ class CommandFactory
      * @param commandArgs 使用到的命令行对象
      * @return 初始化后的命令类
      */
-    AbstractCommand getCommand(CommandArgs commandArgs)
+    AbstractCommand getCommand(CommandArgs commandArgs) throws MyExcepiton
     {
         AbstractCommand abstractCommand = null;
         String commandName = commandArgs.getCommandName();
@@ -167,10 +162,8 @@ class CommandFactory
             abstractCommand = new ListCommand();
         }
         else
-        {
-            //TODO: 此处应抛出没有相应命令的异常
-            System.out.println("程序没有相应命令");
-        }
+            throw new MyExcepiton("程序没有相应的命令");
+
         init(abstractCommand, commandArgs);
 
         return abstractCommand;
@@ -181,13 +174,13 @@ class CommandFactory
      * @param abstractCommand 要初始化的命令类
      * @param commandArgs 使用到的命令行对象
      */
-    private void init(AbstractCommand abstractCommand, CommandArgs commandArgs)
+    private void init(AbstractCommand abstractCommand, CommandArgs commandArgs) throws MyExcepiton
     {
         String[] parameters = abstractCommand.getParameters();
 
-        for (int i = 0; i < parameters.length; i++)
-            if (commandArgs.hasParameter(parameters[i]))
-                abstractCommand.config(parameters[i], commandArgs.getValue(parameters[i]));
+        for (String parameter : parameters)
+            if (commandArgs.hasParameter(parameter))
+                abstractCommand.config(parameter, commandArgs.getValue(parameter));
     }
 }
 
@@ -262,7 +255,7 @@ class ListCommand implements AbstractCommand
      */
     ListCommand()
     {
-        for(PATIENT_TYPE type : PATIENT_TYPE.values())
+        for (PATIENT_TYPE type : PATIENT_TYPE.values())
         {
             showTypes.add(type);
         }
@@ -275,7 +268,7 @@ class ListCommand implements AbstractCommand
     }
 
     @Override
-    public void config(String parameter, String val)
+    public void config(String parameter, String val) throws MyExcepiton
     {
         if (PARAMETER_LOG_PATH.equals(parameter))
         {
@@ -283,8 +276,7 @@ class ListCommand implements AbstractCommand
 
             if (!dir.exists())
             {
-                //TODO: 改为抛出路径不存在的异常
-                System.out.println("日志文件夹不存在");
+                throw new MyExcepiton("日志文件夹不存在");
             }
             inputPath = val;
         }
@@ -294,11 +286,15 @@ class ListCommand implements AbstractCommand
         }
         else if (PARAMETER_DEADLINE.equals(parameter))
         {
-            /*
-            TODO: 这里将会对日期格式进行检验，日期格式由LocalDate类内置指定，为“XXXX-XX-XX”
-                如果日期出现错误，将会抛出java.time.format.DateTimeParseException错误，需要在对应位置进行处理
-            */
-            deadLine = LocalDate.parse(val);
+            try
+            {
+                deadLine = LocalDate.parse(val);
+            }
+            catch(DateTimeParseException ex)
+            {
+                throw new MyExcepiton("日期参数不正确，应满足YYYY-MM-DD的格式");
+            }
+
     }
         else if (PARAMETER_TYPE.equals(parameter))
         {
@@ -315,10 +311,7 @@ class ListCommand implements AbstractCommand
                 else if (DEAD_PATIENTS.equals(types[i]))
                     showTypes.add(PATIENT_TYPE.DEAD);
                 else
-                {
-                    //TODO 这里应该抛出参数错误的异常
-                    System.out.println("输入参数有误");
-                }
+                    throw new MyExcepiton("输入参数有误");
             }
         }
         else if (PARAMETER_PROVINCES.equals(parameter))
@@ -339,16 +332,13 @@ class ListCommand implements AbstractCommand
                     }
                 }
                 if (!isMatch)
-                {
-                    //TODO: 此处应抛出省份参数错误的异常
-                    System.out.println("省份参数错误");
-                }
+                    throw new MyExcepiton("省份参数错误");
             }
         }
     }
 
     @Override
-    public void execute()
+    public void execute() throws MyExcepiton
     {
         List<String>logs = getLogFile();
 
@@ -374,19 +364,18 @@ class ListCommand implements AbstractCommand
                 parser = new LogParser(inputPath, log);
                 while((changes = parser.nextLine()) != null)
                 {
-                    for(ChangeArray change: changes)
+                    for (ChangeArray change: changes)
                     {
                         String province = change.getProvince();
                         int index = 0;
-                        for(; index < PROVINCES.length; index++)
+                        for (; index < PROVINCES.length; index++)
                         {
                             if (PROVINCES[index].equals(province))
                                 break;
                         }
                         if (index == PROVINCES.length)
                         {
-                            //TODO: 此处抛出出现未知省份的异常
-                            System.out.println("出现未知省份");
+                            throw new MyExcepiton("出现未知省份");
                         }
 
                         if (!isChange[index])
@@ -399,13 +388,11 @@ class ListCommand implements AbstractCommand
         }
         catch (FileNotFoundException ex)
         {
-            //TODO： 此处应抛出日志文件不存在的异常
-            System.out.println("日志文件不存在");
+            throw new MyExcepiton("日志文件不存在");
         }
         catch (IOException ex)
         {
-            //TODO: 此处应抛出日志文件读取出错的异常
-            System.out.println("日志文件读取出错");
+            throw new MyExcepiton("日志文件读取出错");
         }
 
         //输出数据
@@ -438,8 +425,7 @@ class ListCommand implements AbstractCommand
         }
         catch (FileNotFoundException ex)
         {
-            //TODO： 此处应抛出文件不存在异常
-            System.out.println("输出文件创建失败");
+            throw new MyExcepiton("输出文件夹创建失败");
         }
 
         /* 以下代码用于检测命令类是否配置成功
@@ -457,14 +443,14 @@ class ListCommand implements AbstractCommand
      * 获得命令参数中inputPath对应的目录下的所有满足日志格式，并在date参数指定的日期之前的日志文件
      * @return log参数值的目录下，在date指定的日期之前（包括指定日期）的所有日志名称数组
      */
-    private List<String> getLogFile()
+    private List<String> getLogFile() throws MyExcepiton
     {
         File dir = new File(inputPath);
         String[] names = dir.list();
         List<String>logs = new ArrayList<>();
         String DATA_FORMAT = "^\\d{4}-\\d{2}-\\d{2}.log.txt$";
 
-        for(int i = 0 ; i < names.length; i++)
+        for (int i = 0 ; i < names.length; i++)
             if (Pattern.matches(DATA_FORMAT, names[i]))
             {
                 try
@@ -479,10 +465,7 @@ class ListCommand implements AbstractCommand
             }
 
         if (logs.size() <= 0)
-        {
-            //TODO: 此处应抛出目录下不存在日志文件的异常
-            System.out.println("不存在日志文件");
-        }
+            throw  new MyExcepiton("不存在日志文件");
         Collections.sort(logs);
         return logs;
     }
@@ -622,11 +605,14 @@ class LogParser
     }
 
     /**
+     *
+     /**
      * 从第一行开始，每调用一次，返回下一行数据。
      * @return 之前读取行的下一行。如果到达文件结尾，则返回null并关闭打开的文件
      * @throws IOException 如果读写器已经关闭后还执行该方法，或者读取下一行数据时出现错误，则抛出该异常
+     * @throws MyExcepiton 如果出现责任链不能处理的行，将抛出MyException
      */
-    List<ChangeArray> nextLine() throws IOException
+    List<ChangeArray> nextLine() throws IOException, MyExcepiton
     {
         String line;
 
@@ -664,7 +650,7 @@ interface LogLine
      * @param line
      * @return
      */
-    List<ChangeArray> parseLine(String line);
+    List<ChangeArray> parseLine(String line) throws MyExcepiton;
 }
 
 /**
@@ -682,7 +668,7 @@ class CommentLine implements LogLine
     }
 
     @Override
-    public List<ChangeArray> parseLine(String line)
+    public List<ChangeArray> parseLine(String line) throws MyExcepiton
     {
         if ("".equals(line) || Pattern.matches(PATTERN, line))
             return null;
@@ -706,7 +692,7 @@ class IncreaseInfectionPatientLine implements LogLine
     }
 
     @Override
-    public List<ChangeArray> parseLine(String line)
+    public List<ChangeArray> parseLine(String line) throws MyExcepiton
     {
         if (Pattern.matches(PATTERN, line))
         {
@@ -743,7 +729,7 @@ class IncreaseSuspectedPatientLine implements LogLine
     }
 
     @Override
-    public List<ChangeArray> parseLine(String line)
+    public List<ChangeArray> parseLine(String line) throws MyExcepiton
     {
         if (Pattern.matches(PATTERN, line))
         {
@@ -780,7 +766,7 @@ class ChangeInfectionPatientLine implements LogLine
     }
 
     @Override
-    public List<ChangeArray> parseLine(String line)
+    public List<ChangeArray> parseLine(String line) throws MyExcepiton
     {
         if (Pattern.matches(PATTERN, line))
         {
@@ -819,7 +805,7 @@ class ChangeSuspectedPatientLine implements LogLine
     }
 
     @Override
-    public List<ChangeArray> parseLine(String line)
+    public List<ChangeArray> parseLine(String line) throws MyExcepiton
     {
         if (Pattern.matches(PATTERN, line))
         {
@@ -857,7 +843,7 @@ class IncreaseDeadPatientLine implements LogLine
     }
 
     @Override
-    public List<ChangeArray> parseLine(String line)
+    public List<ChangeArray> parseLine(String line) throws MyExcepiton
     {
         if (Pattern.matches(PATTERN, line))
         {
@@ -896,7 +882,7 @@ class IncreaseCurePatientLine implements LogLine
     }
 
     @Override
-    public List<ChangeArray> parseLine(String line)
+    public List<ChangeArray> parseLine(String line) throws MyExcepiton
     {
         if (Pattern.matches(PATTERN, line))
         {
@@ -935,7 +921,7 @@ class ComfireInfectionPatientLine implements LogLine
     }
 
     @Override
-    public List<ChangeArray> parseLine(String line)
+    public List<ChangeArray> parseLine(String line) throws MyExcepiton
     {
         if (Pattern.matches(PATTERN, line))
         {
@@ -974,7 +960,7 @@ class ExcludeSuspectedPatientLine implements LogLine
     }
 
     @Override
-    public List<ChangeArray> parseLine(String line)
+    public List<ChangeArray> parseLine(String line) throws MyExcepiton
     {
         if (Pattern.matches(PATTERN, line))
         {
@@ -1008,11 +994,24 @@ class UnexpectedLine implements LogLine
     }
 
     @Override
-    public List<ChangeArray> parseLine(String line)
+    public List<ChangeArray> parseLine(String line) throws MyExcepiton
     {
-        //TODO: 抛出一个意料之外的行的异常
-        System.out.println("出现一个意料之外的行");
-        System.out.println(line);
-        return null;
+        throw new MyExcepiton("出现一个意料之外的行\n" + line);
     }
+}
+
+class MyExcepiton extends Exception
+{
+    private String message;
+
+    public MyExcepiton(String message)
+    {
+        this.message = message;
+    }
+
+    public String getMessage()
+    {
+        return message;
+    }
+
 }
