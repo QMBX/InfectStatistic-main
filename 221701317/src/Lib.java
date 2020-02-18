@@ -1,9 +1,11 @@
-import java.io.File;
+import junit.framework.TestCase;
+import org.junit.Test;
+
+import javax.xml.stream.events.Comment;
+import java.io.*;
 import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
@@ -19,6 +21,7 @@ public class Lib
     void run(String[] args)
     {
         System.out.println("enter Lib class in run");
+
         CommandArgs commandArgs = new CommandArgs(args);
         CommandFactory factory = new CommandFactory();
         AbstractCommand command = factory.getCommand(commandArgs);
@@ -141,7 +144,8 @@ class CommandArgs
 }
 
 /**
- * 将命令类注册到工厂，由工厂根据命令行参数生成对应的类
+ * 命令类工厂，根据命令行参数生成对应的类
+ * 程序的所有命令类需要添加到该类的getCommand方法中
  */
 class CommandFactory
 {
@@ -276,7 +280,7 @@ class ListCommand implements AbstractCommand
         else if (PARAMETER_PROVINCES.equals(parameter))
         {
             String[] provinces = val.split(" ");
-            boolean isMatch = false;
+            boolean isMatch;
 
             for (int i = 0; i < provinces.length; i++)
             {
@@ -303,6 +307,65 @@ class ListCommand implements AbstractCommand
     @Override
     public void execute()
     {
+        File dir = new File(inputPath);
+        String[] names = dir.list();
+        List<String>logs = new ArrayList<>();
+        String DATA_FORMAT = "^\\d{4}-\\d{2}-\\d{2}.log.txt$";
+
+        for(int i = 0 ; i < names.length; i++)
+        {
+            if (Pattern.matches(DATA_FORMAT, names[i]))
+            {
+                logs.add(names[i]);
+            }
+        }
+        if (logs.size() <= 0)
+        {
+            //TODO: 此处应抛出不存在日志文件的异常
+            System.out.println("不存在日志文件");
+        }
+        Collections.sort(logs);
+
+        try
+        {
+            BufferedReader dataInput;
+
+            String line;
+
+            for (String log : logs)
+            {
+                dataInput = new BufferedReader(new InputStreamReader(new FileInputStream(inputPath)));
+
+                line = dataInput.readLine();
+
+
+
+            }
+        }
+        catch (FileNotFoundException ex)
+        {
+            //TODO： 此处应抛出日志文件不存在的异常
+            System.out.println("日志文件不存在");
+        }
+        catch (IOException ex)
+        {
+            //TODO: 此处应抛出日志文件读取出错的异常
+            System.out.println("日志文件读取出错");
+        }
+
+
+        try
+        {
+            BufferedWriter dataOutput
+                    = new BufferedWriter(new OutputStreamWriter(new FileOutputStream(outputPath)));
+
+        }
+        catch (FileNotFoundException ex)
+        {
+            //TODO： 此处应抛出文件不存在异常
+            System.out.println("输出文件创建失败");
+        }
+
         /* 以下代码用于检测命令类是否配置成功
         System.out.println("inputPath: " + inputPath);
         System.out.println("outputPath: " + outputPath);
@@ -312,5 +375,470 @@ class ListCommand implements AbstractCommand
         for (int i = 0; i < showProvinces.size(); i++)
             System.out.println(showProvinces.get(i));
         */
+    }
+}
+
+
+class ChangeArray
+{
+    String province;
+    PATIENT_TYPE type;
+    int num;
+
+    private ChangeArray(){}
+
+    static ChangeArray changeOf(String province, PATIENT_TYPE type, int num)
+    {
+        ChangeArray increase = new ChangeArray();
+
+        increase.province = province;
+        increase.type = type;
+        increase.num = num;
+
+        return increase;
+    }
+    String getProvince()
+    {
+        return province;
+    }
+    PATIENT_TYPE getType()
+    {
+        return type;
+    }
+    int getNum()
+    {
+        return num;
+    }
+}
+
+
+class LogParser
+{
+    String logName, path;
+    BufferedReader dataInput;
+    CommentLine commentLine;
+    IncreaseInfectionPatientLine increaseInfectionPatientLine;
+    IncreaseSuspectedPatientLine increaseSuspectedPatientLine;
+    ChangeInfectionPatientLine changeInfectionPatientLine;
+    ChangeSuspectedPatientLine changeSuspectedPatientLine;
+    IncreaseDeadPatientLine increaseDeadPatientLine;
+    IncreaseCurePatientLine increaseCurePatientLine;
+    ComfireInfectionPatientLine comfireInfectionPatientLine;
+    ExcludeSuspectedPatientLine excludeSuspectedPatientLine;
+    UnexpectedLine unexpectedLine;
+    LogParser(String path, String name) throws FileNotFoundException
+    {
+        this.path = path;
+        this.logName = name;
+
+        dataInput = new BufferedReader(new InputStreamReader(new FileInputStream(path + "\\" + logName)));
+
+        commentLine = new CommentLine();
+        increaseInfectionPatientLine = new IncreaseInfectionPatientLine();
+        increaseSuspectedPatientLine = new IncreaseSuspectedPatientLine();
+        changeInfectionPatientLine = new ChangeInfectionPatientLine();
+        changeSuspectedPatientLine = new ChangeSuspectedPatientLine();
+        increaseDeadPatientLine = new IncreaseDeadPatientLine();
+        increaseCurePatientLine = new IncreaseCurePatientLine();
+        comfireInfectionPatientLine = new ComfireInfectionPatientLine();
+        excludeSuspectedPatientLine = new ExcludeSuspectedPatientLine();
+        unexpectedLine = new UnexpectedLine();
+
+        commentLine.setNextLogLine(increaseInfectionPatientLine);
+        increaseInfectionPatientLine.setNextLogLine(increaseSuspectedPatientLine);
+        increaseSuspectedPatientLine.setNextLogLine(changeInfectionPatientLine);
+        changeInfectionPatientLine.setNextLogLine(changeSuspectedPatientLine);
+        changeSuspectedPatientLine.setNextLogLine(increaseDeadPatientLine);
+        increaseDeadPatientLine.setNextLogLine(increaseCurePatientLine);
+        increaseCurePatientLine.setNextLogLine(comfireInfectionPatientLine);
+        comfireInfectionPatientLine.setNextLogLine(excludeSuspectedPatientLine);
+        excludeSuspectedPatientLine.setNextLogLine(unexpectedLine);
+    }
+
+    List<ChangeArray> nextLine() throws IOException
+    {
+        String line;
+
+        line = dataInput.readLine();
+        if (line != null)
+        {
+            return commentLine.parseLine(line);
+        }
+        else
+            return null;
+    }
+
+
+    void close() throws IOException
+    {
+        dataInput.close();
+    }
+
+
+}
+
+interface LogLine
+{
+    /**
+     * 设置下一个行处理对象
+     * @param logLine
+     */
+    void setNextLogLine(LogLine logLine);
+
+    /**
+     * 对行进行处理，如果处理失败，则传递给下一个行处理对象
+     * @param line
+     * @return
+     */
+    List<ChangeArray> parseLine(String line);
+}
+
+/**
+ * 对应行格式：以//开头的注释
+ */
+class CommentLine implements LogLine
+{
+    private static final String PATTERN = "^//.*";
+    private LogLine nextLogLine;
+
+    @Override
+    public void setNextLogLine(LogLine logLine)
+    {
+        nextLogLine = logLine;
+    }
+
+    @Override
+    public List<ChangeArray> parseLine(String line)
+    {
+        if (Pattern.matches(PATTERN, line))
+            return null;
+        else
+            return nextLogLine.parseLine(line);
+    }
+}
+
+/**
+ * 对应行格式：<省> 新增 感染患者 n人
+ */
+class IncreaseInfectionPatientLine implements LogLine
+{
+    private static final String PATTERN = ".*新增 感染患者.*";
+    private LogLine nextLogLine;
+
+    @Override
+    public void setNextLogLine(LogLine logLine)
+    {
+        nextLogLine = logLine;
+    }
+
+    @Override
+    public List<ChangeArray> parseLine(String line)
+    {
+        if (Pattern.matches(PATTERN, line))
+        {
+            List<ChangeArray> result = new ArrayList<>();
+            String[] words = line.split(" ");
+
+            String regEx="[^0-9]";
+            Pattern p = Pattern.compile(regEx);
+            Matcher m = p.matcher(words[3]);
+            int num = Integer.parseInt(m.replaceAll(""));
+            ChangeArray change = ChangeArray.changeOf(words[0], PATIENT_TYPE.INFECTION, num);
+            result.add(change);
+
+            return result;
+        }
+        else
+             return nextLogLine.parseLine(line);
+
+    }
+}
+
+/**
+ * 对应行格式：<省> 新增 疑似患者 n人
+ */
+class IncreaseSuspectedPatientLine implements LogLine
+{
+    private static final String PATTERN = ".*新增 疑似患者.*";
+    private LogLine nextLogLine;
+
+    @Override
+    public void setNextLogLine(LogLine logLine)
+    {
+        nextLogLine = logLine;
+    }
+
+    @Override
+    public List<ChangeArray> parseLine(String line)
+    {
+        if (Pattern.matches(PATTERN, line))
+        {
+            List<ChangeArray> result = new ArrayList<>();
+            String[] words = line.split(" ");
+
+            String regEx="[^0-9]";
+            Pattern p = Pattern.compile(regEx);
+            Matcher m = p.matcher(words[3]);
+            int num = Integer.parseInt(m.replaceAll(""));
+            ChangeArray change = ChangeArray.changeOf(words[0], PATIENT_TYPE.SUSPECTED, num);
+            result.add(change);
+
+            return result;
+        }
+        else
+            return nextLogLine.parseLine(line);
+
+    }
+}
+
+/**
+ * 对应行格式：<省1> 感染患者 流入 <省2> n人
+ */
+class ChangeInfectionPatientLine implements LogLine
+{
+    private static final String PATTERN = ".*感染患者 流入.*";
+    private LogLine nextLogLine;
+
+    @Override
+    public void setNextLogLine(LogLine logLine)
+    {
+        nextLogLine = logLine;
+    }
+
+    @Override
+    public List<ChangeArray> parseLine(String line)
+    {
+        if (Pattern.matches(PATTERN, line))
+        {
+            List<ChangeArray> result = new ArrayList<>();
+            String[] words = line.split(" ");
+
+            String regEx="[^0-9]";
+            Pattern p = Pattern.compile(regEx);
+            Matcher m = p.matcher(words[4]);
+            int num = Integer.parseInt(m.replaceAll(""));
+            ChangeArray change = ChangeArray.changeOf(words[0], PATIENT_TYPE.INFECTION, -num);
+            result.add(change);
+            change = ChangeArray.changeOf(words[3],PATIENT_TYPE.INFECTION, num);
+            result.add(change);
+
+            return result;
+        }
+        else
+            return nextLogLine.parseLine(line);
+
+    }
+}
+
+/**
+ * 对应行格式：<省1> 疑似患者 流入 <省2> n人
+ */
+class ChangeSuspectedPatientLine implements LogLine
+{
+    private static final String PATTERN = ".*疑似患者 流入.*";
+    private LogLine nextLogLine;
+
+    @Override
+    public void setNextLogLine(LogLine logLine)
+    {
+        nextLogLine = logLine;
+    }
+
+    @Override
+    public List<ChangeArray> parseLine(String line)
+    {
+        if (Pattern.matches(PATTERN, line))
+        {
+            List<ChangeArray> result = new ArrayList<>();
+            String[] words = line.split(" ");
+
+            String regEx="[^0-9]";
+            Pattern p = Pattern.compile(regEx);
+            Matcher m = p.matcher(words[4]);
+            int num = Integer.parseInt(m.replaceAll(""));
+            ChangeArray change = ChangeArray.changeOf(words[0], PATIENT_TYPE.SUSPECTED, -num);
+            result.add(change);
+            change = ChangeArray.changeOf(words[3],PATIENT_TYPE.SUSPECTED, num);
+            result.add(change);
+
+            return result;
+        }
+        else
+            return nextLogLine.parseLine(line);
+    }
+}
+
+/**
+ * 对应行格式：<省> 死亡 n人
+ */
+class IncreaseDeadPatientLine implements LogLine
+{
+    private static final String PATTERN = ".*死亡.*";
+    private LogLine nextLogLine;
+
+    @Override
+    public void setNextLogLine(LogLine logLine)
+    {
+        nextLogLine = logLine;
+    }
+
+    @Override
+    public List<ChangeArray> parseLine(String line)
+    {
+        if (Pattern.matches(PATTERN, line))
+        {
+            List<ChangeArray> result = new ArrayList<>();
+            String[] words = line.split(" ");
+
+            String regEx="[^0-9]";
+            Pattern p = Pattern.compile(regEx);
+            Matcher m = p.matcher(words[2]);
+            int num = Integer.parseInt(m.replaceAll(""));
+            ChangeArray change = ChangeArray.changeOf(words[0], PATIENT_TYPE.DEAD, num);
+            result.add(change);
+            change = ChangeArray.changeOf(words[0], PATIENT_TYPE.INFECTION, -num);
+            result.add(change);
+
+            return result;
+        }
+        else
+            return nextLogLine.parseLine(line);
+
+    }
+}
+
+/**
+ * 对应行格式：<省> 治愈 n人
+ */
+class IncreaseCurePatientLine implements LogLine
+{
+    private static final String PATTERN = ".*死亡.*";
+    private LogLine nextLogLine;
+
+    @Override
+    public void setNextLogLine(LogLine logLine)
+    {
+        nextLogLine = logLine;
+    }
+
+    @Override
+    public List<ChangeArray> parseLine(String line)
+    {
+        if (Pattern.matches(PATTERN, line))
+        {
+            List<ChangeArray> result = new ArrayList<>();
+            String[] words = line.split(" ");
+
+            String regEx="[^0-9]";
+            Pattern p = Pattern.compile(regEx);
+            Matcher m = p.matcher(words[2]);
+            int num = Integer.parseInt(m.replaceAll(""));
+            ChangeArray change = ChangeArray.changeOf(words[0], PATIENT_TYPE.CURE, num);
+            result.add(change);
+            change = ChangeArray.changeOf(words[0],PATIENT_TYPE.INFECTION, -num);
+            result.add(change);
+
+            return result;
+        }
+        else
+            return nextLogLine.parseLine(line);
+
+    }
+}
+
+/**
+ * 对应行格式：<省> 疑似患者 确诊感染 n人
+ */
+class ComfireInfectionPatientLine implements LogLine
+{
+    private static final String PATTERN = ".*疑似患者 确诊感染.*";
+    private LogLine nextLogLine;
+
+    @Override
+    public void setNextLogLine(LogLine logLine)
+    {
+        nextLogLine = logLine;
+    }
+
+    @Override
+    public List<ChangeArray> parseLine(String line)
+    {
+        if (Pattern.matches(PATTERN, line))
+        {
+            List<ChangeArray> result = new ArrayList<>();
+            String[] words = line.split(" ");
+
+            String regEx="[^0-9]";
+            Pattern p = Pattern.compile(regEx);
+            Matcher m = p.matcher(words[3]);
+            int num = Integer.parseInt(m.replaceAll(""));
+            ChangeArray change = ChangeArray.changeOf(words[0], PATIENT_TYPE.INFECTION, num);
+            result.add(change);
+            change = ChangeArray.changeOf(words[0],PATIENT_TYPE.SUSPECTED, -num);
+            result.add(change);
+
+            return result;
+        }
+        else
+            return nextLogLine.parseLine(line);
+
+    }
+}
+
+/**
+ * 对应行格式：<省> 排除 疑似患者 n人
+ */
+class ExcludeSuspectedPatientLine implements LogLine
+{
+    private static final String PATTERN = ".*排除 疑似患者.*";
+    private LogLine nextLogLine;
+
+    @Override
+    public void setNextLogLine(LogLine logLine)
+    {
+        nextLogLine = logLine;
+    }
+
+    @Override
+    public List<ChangeArray> parseLine(String line)
+    {
+        if (Pattern.matches(PATTERN, line))
+        {
+            List<ChangeArray> result = new ArrayList<>();
+            String[] words = line.split(" ");
+
+            String regEx="[^0-9]";
+            Pattern p = Pattern.compile(regEx);
+            Matcher m = p.matcher(words[3]);
+            int num = Integer.parseInt(m.replaceAll(""));
+            ChangeArray change = ChangeArray.changeOf(words[0],PATIENT_TYPE.SUSPECTED, -num);
+            result.add(change);
+
+            return result;
+        }
+        else
+            return nextLogLine.parseLine(line);
+
+
+    }
+}
+
+/**
+ * 对应行格式：在之前都没有出现的行,对该行解析将抛出异常
+ */
+class UnexpectedLine implements LogLine
+{
+    @Override
+    public void setNextLogLine(LogLine logLine)
+    {
+    }
+
+    @Override
+    public List<ChangeArray> parseLine(String line)
+    {
+        //TODO: 抛出一个意料之外的行的异常
+        System.out.println("出现一个意料之外的行");
+
+        return null;
     }
 }
